@@ -17,6 +17,7 @@ func main() {
 	mux.HandleFunc("/healthz", healthCheckHandler)
 
 	handler := middleware.Chain(
+		middleware.RequestID(),
 		middleware.RequestLogging(logger),
 	)(mux)
 
