@@ -16,7 +16,9 @@ func main() {
 
 	mux.HandleFunc("/healthz", healthCheckHandler)
 
-	handler := middleware.RequestLogging(logger)(mux)
+	handler := middleware.Chain(
+		middleware.RequestLogging(logger),
+	)(mux)
 
 	logger.Info("started server", slog.String("address", ":8080"))
 	if err := http.ListenAndServe(":8080", handler); err != nil {
