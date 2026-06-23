@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+
+	"github.com/a3dif3x/yat/backend/internal/middleware"
 )
 
 func main() {
@@ -14,8 +16,10 @@ func main() {
 
 	mux.HandleFunc("/healthz", healthCheckHandler)
 
+	handler := middleware.RequestLogging(logger)(mux)
+
 	logger.Info("started server", slog.String("address", ":8080"))
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	if err := http.ListenAndServe(":8080", handler); err != nil {
 		logger.Error("server stopped", slog.Any("error", err))
 		os.Exit(1)
 	}
