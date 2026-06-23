@@ -1,22 +1,27 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 )
 
 func main() {
+
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/healthz", healthCheckHandler)
 
-	log.Println("listening on :8080")
+	logger.Info("started server", slog.String("address", ":8080"))
 	if err := http.ListenAndServe(":8080", mux); err != nil {
-		log.Fatal(err)
+		logger.Error("server stopped", slog.Any("error", err))
+		os.Exit(1)
 	}
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	_, _ := w.Write([]byte("OK"))
+	_, _ = w.Write([]byte("OK"))
 }
