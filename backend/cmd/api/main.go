@@ -18,13 +18,13 @@ func main() {
 
 	handler := middleware.Chain(
 		middleware.RequestID(),
+		middleware.Recovery(logger),
 		middleware.RequestLogging(logger),
 	)(mux)
 
 	logger.Info("started server", slog.String("address", ":8080"))
 	if err := http.ListenAndServe(":8080", handler); err != nil {
 		logger.Error("server stopped", slog.Any("error", err))
-		os.Exit(1)
 	}
 }
 
