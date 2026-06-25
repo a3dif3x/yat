@@ -1,23 +1,30 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/a3dif3x/yat/backend/internal/config"
 	"github.com/a3dif3x/yat/backend/internal/middleware"
 )
 
 func main() {
-
-	config, err := config.Load()
-	if err != nil {
-		slog.New(slog.NewJSONHandler(os.Stderr, nil)).Error("config load failed", slog.Any("error", err))
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "fatal:", err)
 		os.Exit(1)
 	}
+}
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: config.LogLevel}))
+func run() error {
+	config, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: config.LogLevel}))
 
 	mux := http.NewServeMux()
 
@@ -29,12 +36,18 @@ func main() {
 		middleware.RequestLogging(logger),
 	)(mux)
 
-	address := ":" + config.Port
-
-	logger.Info("started server", slog.String("address", address))
-	if err := http.ListenAndServe(address, handler); err != nil {
-		logger.Error("server stopped", slog.Any("error", err))
+	srv := &http.Server{
+		Addr:              ":" + config.Port,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
+
+	logger.Info("started server", slog.String("address", srv.Addr))
+
+	return srv.ListenAndServe()
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
