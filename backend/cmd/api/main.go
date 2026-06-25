@@ -5,12 +5,19 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/a3dif3x/yat/backend/internal/config"
 	"github.com/a3dif3x/yat/backend/internal/middleware"
 )
 
 func main() {
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	config, err := config.Load()
+	if err != nil {
+		slog.New(slog.NewJSONHandler(os.Stderr, nil)).Error("config load failed", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: config.LogLevel}))
 
 	mux := http.NewServeMux()
 
@@ -22,8 +29,10 @@ func main() {
 		middleware.RequestLogging(logger),
 	)(mux)
 
-	logger.Info("started server", slog.String("address", ":8080"))
-	if err := http.ListenAndServe(":8080", handler); err != nil {
+	address := ":" + config.Port
+
+	logger.Info("started server", slog.String("address", address))
+	if err := http.ListenAndServe(address, handler); err != nil {
 		logger.Error("server stopped", slog.Any("error", err))
 	}
 }
