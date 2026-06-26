@@ -30,9 +30,16 @@ func run() error {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: config.LogLevel}))
 
+	pool, err := pgxpool.New(context.Background(), config.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("create database pool: %w", err)
+	}
+	defer pool.Close()
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/healthz", healthCheckHandler)
+	mux.HandleFunc("/readyz", readyCheckHandler(pool))
 
 	handler := middleware.Chain(
 		middleware.RequestID(),
