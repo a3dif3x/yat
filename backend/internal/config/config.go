@@ -7,8 +7,9 @@ import (
 )
 
 type Config struct {
-	Port     string
-	LogLevel slog.Level
+	Port        string
+	LogLevel    slog.Level
+	DatabaseURL string
 }
 
 func Load() (Config, error) {
@@ -18,9 +19,15 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		return Config{}, fmt.Errorf("database URL is required")
+	}
+
 	cfg := Config{
-		Port:     port,
-		LogLevel: logLevel,
+		Port:        port,
+		LogLevel:    logLevel,
+		DatabaseURL: databaseURL,
 	}
 
 	return cfg, nil

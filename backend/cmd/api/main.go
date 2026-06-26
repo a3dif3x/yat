@@ -12,6 +12,7 @@ import (
 
 	"github.com/a3dif3x/yat/backend/internal/config"
 	"github.com/a3dif3x/yat/backend/internal/middleware"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -29,9 +30,16 @@ func run() error {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: config.LogLevel}))
 
+	pool, err := pgxpool.New(context.Background(), config.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("create database pool: %w", err)
+	}
+	defer pool.Close()
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/healthz", healthCheckHandler)
+	mux.HandleFunc("/readyz", readyCheckHandler(pool))
 
 	handler := middleware.Chain(
 		middleware.RequestID(),
@@ -81,4 +89,20 @@ func run() error {
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
+}
+
+func readyCheckHandler(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+
+		if err := pool.Ping(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("NOT READY"))
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("READY"))
+	}
 }
