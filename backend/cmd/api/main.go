@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/a3dif3x/yat/backend/internal/config"
@@ -45,9 +48,34 @@ func run() error {
 		IdleTimeout:       120 * time.Second,
 	}
 
-	logger.Info("started server", slog.String("address", srv.Addr))
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	return srv.ListenAndServe()
+	serverError := make(chan error, 1)
+
+	go func() {
+		logger.Info("started server", slog.String("address", srv.Addr))
+		serverError <- srv.ListenAndServe()
+	}()
+
+	select {
+	case err := <-serverError:
+		return fmt.Errorf("server error: %w", err)
+	case <-ctx.Done():
+		logger.Info("shutdown signal received")
+	}
+
+	stop()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("graceful shutdown failed: %w", err)
+	}
+
+	logger.Info("server stopped cleanly")
+	return nil
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
